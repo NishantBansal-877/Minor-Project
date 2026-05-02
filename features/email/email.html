@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify Your Email Address</title>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #ffffff;
+        font-family: Roboto, Arial, sans-serif;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .title {
+        font-size: 24px;
+        font-weight: 500;
+        color: #1f2937;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      .text {
+        font-size: 16px;
+        color: #4b5563;
+        line-height: 24px;
+        margin-bottom: 16px;
+      }
+
+      .token-container {
+        background-color: #f5f7fa;
+        border-radius: 8px;
+        font-family: monospace;
+        letter-spacing: 5px;
+        font-size: 28px;
+        font-weight: bold;
+        color: #111827;
+        text-align: center;
+        padding: 20px;
+        margin: 20px 0;
+      }
+
+      .button {
+        display: inline-block;
+        background-color: #0070f3;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 500;
+        padding: 15px 25px;
+        border-radius: 6px;
+        text-decoration: none;
+        margin: 20px 0;
+      }
+
+      .divider {
+        border-top: 1px solid #e5e7eb;
+        margin: 30px 0;
+      }
+
+      .footer-text {
+        font-size: 14px;
+        color: #98a2b3;
+        text-align: center;
+        margin-top: 8px;
+      }
+
+      .footer-links a {
+        color: #0070f3;
+        text-decoration: none;
+        margin: 0 5px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2 style="text-align: center">Hello {{name}}👋</h2>
+      <div class="title">Verify Your Email Address</div>
+
+      <div class="text">
+        Thanks for signing up! Please verify your email address to complete your
+        registration.
+      </div>
+
+      <div class="text">Your verification code:</div>
+
+      <div class="token-container">{{otp}}</div>
+
+      <div class="text">
+        If you didn't sign up for this account, you can safely ignore this
+        email.
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="footer-text">© 2025 LIS. All rights reserved.</div>
+      <div class="footer-text">Vidisha, India</div>
+    </div>
+  </body>
+</html>

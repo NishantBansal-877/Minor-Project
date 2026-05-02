@@ -1,0 +1,1 @@
+ALTER TABLE `otps` MODIFY COLUMN `email` varchar(255);

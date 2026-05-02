@@ -1,0 +1,1 @@
+ALTER TABLE `temp_users` DROP INDEX `temp_users_number_unique`;

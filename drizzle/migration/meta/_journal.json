@@ -1,0 +1,97 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1777010485490,
+      "tag": "0000_shiny_maelstrom",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1777010834460,
+      "tag": "0001_opposite_vargas",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1777017869901,
+      "tag": "0002_curly_robbie_robertson",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1777023605002,
+      "tag": "0003_narrow_iron_monger",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1777034142633,
+      "tag": "0004_dusty_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1777094489019,
+      "tag": "0005_normal_liz_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1777096060768,
+      "tag": "0006_friendly_diamondback",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1777097339705,
+      "tag": "0007_graceful_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1777108138239,
+      "tag": "0008_calm_ikaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1777108652443,
+      "tag": "0009_jazzy_spirit",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1777192228568,
+      "tag": "0010_lowly_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1777628460466,
+      "tag": "0011_loving_warstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1777628902359,
+      "tag": "0012_tearful_warbound",
+      "breakpoints": true
+    }
+  ]
+}

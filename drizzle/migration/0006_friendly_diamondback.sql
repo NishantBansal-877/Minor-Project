@@ -1,0 +1,2 @@
+ALTER TABLE `otps` ADD `temp_user_id` int NOT NULL;--> statement-breakpoint
+ALTER TABLE `otps` ADD CONSTRAINT `otps_temp_user_id_temp_users_id_fk` FOREIGN KEY (`temp_user_id`) REFERENCES `temp_users`(`id`) ON DELETE cascade ON UPDATE no action;

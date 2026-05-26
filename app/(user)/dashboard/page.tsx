@@ -34,14 +34,14 @@ export default function DashboardPage() {
   const handleView = (reportId: number) => {
     router.push(`/report/${reportId}`);
   };
-
   const filtered = reports
     .filter((r) => r.title.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) =>
-      sort === "newest"
-        ? new Date(b.date).getTime() - new Date(a.date).getTime()
-        : new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
+    .sort((a, b) => {
+      const aTime = a.date ? new Date(a.date).getTime() : 0;
+      const bTime = b.date ? new Date(b.date).getTime() : 0;
+
+      return sort === "newest" ? bTime - aTime : aTime - bTime;
+    });
 
   const statusColor = (status: string) => {
     switch (status) {

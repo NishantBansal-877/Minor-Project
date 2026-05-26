@@ -33,8 +33,6 @@ export const ESR_PANEL: ESRPanel = {
       referenceRange: {
         male: { min: 0, max: 15 },
         female: { min: 0, max: 20 },
-        child: { min: 0, max: 10 },
-        elderly: { min: 0, max: 30 },
       },
       clinicalCategory: "Hematology",
       specimenType: "Whole Blood",

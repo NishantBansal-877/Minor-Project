@@ -16,9 +16,12 @@ import { savePanelDetails } from "@/features/db/admin-queries";
 
 import { toast } from "sonner";
 
-/* =========================================================
-   TYPES
-========================================================= */
+import ReportScanner from "@/components/report-scanner";
+import DocumentPreview from "@/components/document-preview";
+
+import Tesseract from "tesseract.js";
+
+import { extractLabValues } from "@/lib/ocr-parser";
 
 type FormValues = Record<string, string | undefined>;
 
@@ -38,20 +41,12 @@ type PanelResultType = {
 
   values: FormValues;
 
-  labId: string;
-
   panelTitle: string;
-
-  patientId: string;
 
   clinicalCategory?: string;
 
   specimenType?: string;
 };
-
-/* =========================================================
-   COMPONENT
-========================================================= */
 
 export default function FillTestsStepperPage() {
   const router = useRouter();
@@ -62,14 +57,137 @@ export default function FillTestsStepperPage() {
 
   const [currentPanel, setCurrentPanel] = useState<any>(null);
 
-  /* =========================================================
-     REDUX
-  ========================================================= */
-
-  const user = useSelector((state: any) => state.user.user);
-
   const selectedUser = useSelector((state: any) => state.user.selectedUser);
 
+  const labId = useSelector((state: any) => state.user.user.userId);
+
+  const [uploadedFiles, setUploadedFiles] = useState<
+    Record<number, File | null>
+  >({});
+
+  const [ocrLoading, setOcrLoading] = useState(false);
+
+  const processUploadedFile = async (file: File) => {
+    setOcrLoading(true);
+
+    try {
+      let imageSource = "";
+
+      /*
+     ========================================
+     IMAGE FILE
+     ========================================
+    */
+
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+
+        imageSource = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+
+          reader.onerror = reject;
+
+          reader.readAsDataURL(file);
+        });
+      } else if (file.type === "application/pdf") {
+        /*
+     ========================================
+     PDF FILE
+     ========================================
+    */
+        const pdfjsLib = await import("pdfjs-dist");
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url,
+        ).toString();
+
+        const pdfData = await file.arrayBuffer();
+
+        const pdf = await pdfjsLib.getDocument({
+          data: pdfData,
+        }).promise;
+
+        /*
+       ========================================
+       FIRST PAGE
+       ========================================
+      */
+
+        const page = await pdf.getPage(1);
+
+        const viewport = page.getViewport({
+          scale: 2,
+        });
+
+        const canvas = document.createElement("canvas");
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          toast.error("Canvas error");
+
+          setOcrLoading(false);
+
+          return;
+        }
+
+        canvas.width = viewport.width;
+
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+        }).promise;
+
+        imageSource = canvas.toDataURL("image/png");
+      } else {
+        toast.error("Unsupported file type");
+
+        setOcrLoading(false);
+
+        return;
+      }
+
+      /*
+     ========================================
+     OCR
+     ========================================
+    */
+
+      const result = await Tesseract.recognize(imageSource, "eng", {
+        logger: (m) => console.log(m),
+      });
+
+      const text = result.data.text;
+
+      console.log("OCR TEXT:", text);
+
+      /*
+     ========================================
+     EXTRACT VALUES
+     ========================================
+    */
+
+      const extracted = extractLabValues(text, currentPanel.tests);
+
+      console.log(extracted);
+
+      reset({
+        ...watch(),
+        ...extracted,
+      });
+
+      toast.success("Values extracted successfully");
+    } catch (err) {
+      console.error(err);
+
+      toast.error("OCR failed");
+    }
+
+    setOcrLoading(false);
+  };
   const selectedTestGroups = useSelector(
     (state: any) => state.lab.selectedTests,
   ) as TestGroupType[];
@@ -98,10 +216,6 @@ export default function FillTestsStepperPage() {
 
   const currentStepData = groupedPanels?.[step];
 
-  /* =========================================================
-     RHF
-  ========================================================= */
-
   const {
     control,
     handleSubmit,
@@ -116,14 +230,10 @@ export default function FillTestsStepperPage() {
 
   const values = watch();
 
-  /* =========================================================
-     HELPERS
-  ========================================================= */
-
   const isEmpty = (v: any) => v === undefined || v === null || v === "";
 
   /* =========================================================
-     BUILD DEFAULT VALUES
+     DEFAULT VALUES
   ========================================================= */
 
   const buildDefaultValues = (panel: any): FormValues => {
@@ -150,20 +260,12 @@ export default function FillTestsStepperPage() {
 
     const load = async () => {
       try {
-        console.log("currentStepData:", currentStepData);
-
         const groupKey = currentStepData.title
           ?.toLowerCase()
           ?.replace(/\s+/g, "");
 
         const testKey = currentStepData.data?.id?.toLowerCase()?.trim();
 
-        console.log("groupKey:", groupKey);
-        console.log("testKey:", testKey);
-
-        console.log("PANEL_REGISTRY:", PANEL_REGISTRY);
-
-        // check existence
         if (!PANEL_REGISTRY[groupKey]) {
           console.error("Group not found:", groupKey);
           return;
@@ -178,17 +280,11 @@ export default function FillTestsStepperPage() {
 
         const module = await importer();
 
-        console.log("Loaded module:", module);
-
         if (!module) return;
 
         const panel = Object.values(module)[0];
 
         setCurrentPanel(() => panel);
-
-        /* =====================================
-         RESTORE PREVIOUS VALUES
-      ===================================== */
 
         const existingValues = results?.[step]?.values;
 
@@ -202,17 +298,13 @@ export default function FillTestsStepperPage() {
   }, [step, currentStepData, reset, results]);
 
   /* =========================================================
-     RANGE ENGINE
+     RANGE PARSER
   ========================================================= */
 
   const parseRange = (range: any, gender = "male") => {
     if (!range) return null;
 
     let selected = range;
-
-    /* =====================================
-       GENDER RANGE
-    ===================================== */
 
     if (typeof range === "object" && !("min" in range)) {
       selected =
@@ -221,10 +313,6 @@ export default function FillTestsStepperPage() {
 
     if (!selected) return null;
 
-    /* =====================================
-       OBJECT RANGE
-    ===================================== */
-
     if (
       typeof selected === "object" &&
       "min" in selected &&
@@ -232,11 +320,6 @@ export default function FillTestsStepperPage() {
     ) {
       return selected;
     }
-
-    /* =====================================
-       STRING RANGE
-       Example: "12–16"
-    ===================================== */
 
     if (typeof selected === "string") {
       const normalized = selected.replace(/-/g, "–");
@@ -253,10 +336,6 @@ export default function FillTestsStepperPage() {
         }
       }
 
-      /* =====================================
-         EXACT STRING MATCH
-      ===================================== */
-
       return {
         min: selected,
         max: selected,
@@ -272,14 +351,14 @@ export default function FillTestsStepperPage() {
     );
   };
 
+  /* =========================================================
+     STATUS
+  ========================================================= */
+
   const getStatus = (value: any, range: any) => {
     if (!range || isEmpty(value)) {
       return null;
     }
-
-    /* =====================================
-       NUMERIC
-    ===================================== */
 
     if (isNumericRange(range)) {
       const num = Number(value);
@@ -299,10 +378,6 @@ export default function FillTestsStepperPage() {
       return "NORMAL";
     }
 
-    /* =====================================
-       STRING MATCH
-    ===================================== */
-
     const expected = String(range.min).trim().toLowerCase();
 
     const actual = String(value).trim().toLowerCase();
@@ -310,14 +385,14 @@ export default function FillTestsStepperPage() {
     return expected === actual ? "NORMAL" : "ABNORMAL";
   };
 
+  /* =========================================================
+     ERROR MESSAGE
+  ========================================================= */
+
   const getErrorMessage = (value: any, range: any) => {
     if (!range || isEmpty(value)) {
       return undefined;
     }
-
-    /* =====================================
-       NUMERIC
-    ===================================== */
 
     if (isNumericRange(range)) {
       const num = Number(value);
@@ -327,30 +402,30 @@ export default function FillTestsStepperPage() {
       }
 
       if (num < range.min) {
-        return "Below normal range";
+        return `Below normal (${range.min})`;
       }
 
       if (num > range.max) {
-        return "Above normal range";
+        return `Above normal (${range.max})`;
       }
 
       return undefined;
     }
 
-    /* =====================================
-       STRING MATCH
-    ===================================== */
+    const expected = String(range.min).trim().toLowerCase();
 
-    const expected = String(range.min).trim();
+    const actual = String(value).trim().toLowerCase();
 
-    const actual = String(value).trim();
-
-    if (expected.toLowerCase() !== actual.toLowerCase()) {
-      return `Expected: ${expected}`;
+    if (expected !== actual) {
+      return `Expected: ${range.min}`;
     }
 
     return undefined;
   };
+
+  /* =========================================================
+     FORMAT REFERENCE
+  ========================================================= */
 
   const formatRef = (ref: any) => {
     if (!ref) return "-";
@@ -364,17 +439,13 @@ export default function FillTestsStepperPage() {
 
     if (!selected) return "-";
 
-    /* =====================================
-       NUMERIC RANGE
-    ===================================== */
-
     if (typeof selected.min === "number" && typeof selected.max === "number") {
-      return `${selected.min}–${selected.max} (${userGender})`;
-    }
+      if (selected.min === selected.max) {
+        return `${selected.min} (${userGender})`;
+      }
 
-    /* =====================================
-       SAME STRING
-    ===================================== */
+      return `${selected.min} – ${selected.max} (${userGender})`;
+    }
 
     if (selected.min === selected.max) {
       return `${selected.min}`;
@@ -384,28 +455,7 @@ export default function FillTestsStepperPage() {
   };
 
   /* =========================================================
-     ABNORMAL CHECK
-  ========================================================= */
-
-  const hasAbnormal =
-    currentPanel?.tests?.some((test: any) => {
-      const val = values?.[test.key];
-
-      if (isEmpty(val)) {
-        return false;
-      }
-
-      const range = parseRange(test.referenceRange, userGender);
-
-      if (!range) return false;
-
-      const status = getStatus(val, range);
-
-      return status === "LOW" || status === "HIGH" || status === "ABNORMAL";
-    }) || false;
-
-  /* =========================================================
-     SAVE STEP VALUES
+     SAVE STEP
   ========================================================= */
 
   const saveCurrentStepValues = (data: FormValues) => {
@@ -417,11 +467,7 @@ export default function FillTestsStepperPage() {
 
         values: data,
 
-        labId: user.userId,
-
         panelTitle: currentPanel.title,
-
-        patientId: selectedUser.userId,
 
         clinicalCategory: currentPanel.clinicalCategory,
 
@@ -442,11 +488,7 @@ export default function FillTestsStepperPage() {
 
       values: data,
 
-      labId: user.userId,
-
       panelTitle: currentPanel.title,
-
-      patientId: selectedUser.userId,
 
       clinicalCategory: currentPanel.clinicalCategory,
 
@@ -455,27 +497,19 @@ export default function FillTestsStepperPage() {
 
     saveCurrentStepValues(data);
 
-    /* =====================================
-       NEXT STEP
-    ===================================== */
-
     if (step < totalSteps - 1) {
       setStep((s) => s + 1);
 
       return;
     }
 
-    /* =====================================
-       FINAL SUBMIT
-    ===================================== */
-
     const finalResults = [...results];
 
     finalResults[step] = panelData;
 
-    console.log("FINAL RESULT:", finalResults);
+    const patientId = selectedUser.userId;
 
-    const res = await savePanelDetails(finalResults);
+    const res = await savePanelDetails(finalResults, labId, patientId);
 
     if (res?.status === "SUCCESS") {
       toast.success(res.message);
@@ -486,10 +520,6 @@ export default function FillTestsStepperPage() {
     }
   };
 
-  /* =========================================================
-     PROGRESS
-  ========================================================= */
-
   const progress = totalSteps ? ((step + 1) / totalSteps) * 100 : 0;
 
   /* =========================================================
@@ -499,10 +529,6 @@ export default function FillTestsStepperPage() {
   if (!currentPanel || !currentStepData) {
     return <div className="text-white p-6">Loading...</div>;
   }
-
-  /* =========================================================
-     UI
-  ========================================================= */
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col">
@@ -533,6 +559,36 @@ export default function FillTestsStepperPage() {
 
         <Progress value={progress} className="mb-6" />
 
+        <div className=" gap-6 mb-8">
+          {/* <ReportScanner
+            tests={currentPanel.tests}
+            onExtract={(vals) => {
+              reset({
+                ...watch(),
+                ...vals,
+              });
+
+              toast.success("Values auto-filled");
+            }}
+          /> */}
+          <div
+            className="bg-white/5 border-white/10 rounded-xl p-4 flex items-center justify-center"
+            w-full
+          >
+            <DocumentPreview
+              file={uploadedFiles[step] || null}
+              onFileSelect={(file) => {
+                setUploadedFiles((prev) => ({
+                  ...prev,
+                  [step]: file,
+                }));
+
+                processUploadedFile(file);
+              }}
+            />
+          </div>
+        </div>
+
         {/* FORM */}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -550,9 +606,13 @@ export default function FillTestsStepperPage() {
 
               const rhfError = errors[test.key]?.message;
 
+              /* ======================================================
+                 BORDER
+              ====================================================== */
+
               let border = "border-white/10";
 
-              if (rhfError || errorMsg) {
+              if (rhfError) {
                 border = "border-red-500";
               } else if (status === "HIGH" || status === "ABNORMAL") {
                 border = "border-red-400";
@@ -592,53 +652,8 @@ export default function FillTestsStepperPage() {
                         required: test.required ? "Required field" : false,
 
                         validate: (val) => {
-                          /* EMPTY */
-
                           if (isEmpty(val)) {
                             return test.required ? "Required field" : true;
-                          }
-
-                          const range = parseRange(
-                            test.referenceRange,
-                            userGender,
-                          );
-
-                          if (!range) {
-                            return true;
-                          }
-
-                          /* NUMERIC */
-
-                          if (isNumericRange(range)) {
-                            const num = Number(val);
-
-                            // allow submit even if invalid
-                            if (Number.isNaN(num)) {
-                              return true;
-                            }
-
-                            if (num < range.min) {
-                              return true;
-                            }
-
-                            if (num > range.max) {
-                              return true;
-                            }
-
-                            return true;
-                          }
-
-                          /* STRING */
-
-                          const expected = String(range.min)
-                            .trim()
-                            .toLowerCase();
-
-                          const actual = String(val).trim().toLowerCase();
-
-                          // allow submit even if mismatch
-                          if (expected !== actual) {
-                            return true;
                           }
 
                           return true;
@@ -664,11 +679,23 @@ export default function FillTestsStepperPage() {
                       <span>{test.unit}</span>
                     </div>
 
-                    {/* ERROR */}
+                    {/* ERRORS */}
 
-                    {(rhfError || errorMsg) && (
-                      <p className="text-xs text-red-400">
-                        {String(rhfError || errorMsg)}
+                    {rhfError && (
+                      <p className="text-xs text-red-400">{String(rhfError)}</p>
+                    )}
+
+                    {!rhfError && errorMsg && (
+                      <p
+                        className={`text-xs ${
+                          status === "LOW"
+                            ? "text-yellow-400"
+                            : status === "NORMAL"
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                        }`}
+                      >
+                        {errorMsg}
                       </p>
                     )}
                   </CardContent>
@@ -693,7 +720,7 @@ export default function FillTestsStepperPage() {
               ← Previous
             </Button>
 
-            <Button type="submit" className={`text-black bg-emerald-500`}>
+            <Button type="submit" className="text-black bg-emerald-500">
               {step === totalSteps - 1 ? "Submit" : "Next →"}
             </Button>
           </div>

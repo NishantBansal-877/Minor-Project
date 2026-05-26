@@ -6,9 +6,6 @@ import { storeUser } from "../register/register-queries";
 
 export const verifyOtp = async (otp: string, email: string) => {
   try {
-    // if (req.user) {
-    //   return { status: "ERROR", message: "Your are already loggged in" };
-    // }
     const [{ tempUserId }] = await db
       .select()
       .from(otps)

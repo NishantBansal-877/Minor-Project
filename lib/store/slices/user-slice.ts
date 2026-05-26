@@ -67,10 +67,18 @@ const userSlice = createSlice({
     addSelectedUser(state, action) {
       state.selectedUser = { ...action.payload };
     },
+    resetSelectedUser(state) {
+      state.selectedUser = initialState.selectedUser;
+    },
   },
 });
 
-export const { addUserData, updateUserField, resetUser, addSelectedUser } =
-  userSlice.actions;
+export const {
+  addUserData,
+  updateUserField,
+  resetUser,
+  addSelectedUser,
+  resetSelectedUser,
+} = userSlice.actions;
 
 export const userReducer = userSlice.reducer;

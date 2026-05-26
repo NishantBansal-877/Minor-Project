@@ -5,6 +5,7 @@ import {
   json,
   mysqlEnum,
   mysqlTable,
+  primaryKey,
   text,
   timestamp,
   varchar,
@@ -39,11 +40,28 @@ export const labs = mysqlTable("labs", {
     .notNull()
     .unique()
     .references(() => users.userId),
-  labName: varchar("lab_name", { length: 255 }).notNull(),
+  labName: varchar("lab_name", { length: 255 }),
   labOwnerName: varchar("lab_owner_name", { length: 255 }),
 
   avatarUrl: varchar("avatar_url", { length: 255 }),
 });
+
+export const labPatients = mysqlTable(
+  "lab_patients",
+  {
+    labId: varchar("lab_id", { length: 255 })
+      .notNull()
+      .references(() => labs.labId),
+
+    patientId: varchar("patient_id", { length: 255 })
+      .notNull()
+      .references(() => users.userId),
+  },
+
+  (table) => ({
+    pk: primaryKey({ columns: [table.labId, table.patientId] }),
+  }),
+);
 
 export const doctors = mysqlTable("doctors", {
   id: int("id").autoincrement().primaryKey(),

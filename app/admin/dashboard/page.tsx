@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { deleteReport, getPatientDetail } from "@/features/db/admin-queries";
+import { useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Visit = {
   id: string;
   date: string;
   test: string;
   status: "normal" | "critical" | "pending";
-  doctor: string;
-  prescription: string;
-  notes: string;
 };
 
 type Patient = {
@@ -21,60 +22,24 @@ type Patient = {
 };
 
 export default function AdminDashboard() {
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[] | undefined>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { userId } = useSelector((state: any) => state.user.user);
+  const router = useRouter();
 
   useEffect(() => {
-    // mock data (replace with API)
-    const data: Patient[] = [
-      {
-        id: "p1",
-        name: "Ashok Kumar",
-        patientId: "LIS-ASH-4821",
-        visits: [
-          {
-            id: "v1",
-            date: "2025-03-20",
-            test: "CBC",
-            status: "normal",
-            doctor: "Dr. Mehta",
-            prescription: "Iron supplements for 2 weeks",
-            notes: "Hemoglobin slightly low",
-          },
-          {
-            id: "v2",
-            date: "2025-02-10",
-            test: "LFT",
-            status: "critical",
-            doctor: "Dr. Singh",
-            prescription: "Avoid alcohol, liver meds",
-            notes: "Elevated SGPT/SGOT",
-          },
-        ],
-      },
-      {
-        id: "p2",
-        name: "Neha Singh",
-        patientId: "LIS-NEH-7782",
-        visits: [
-          {
-            id: "v3",
-            date: "2025-03-01",
-            test: "KFT",
-            status: "pending",
-            doctor: "Dr. Rao",
-            prescription: "Awaiting results",
-            notes: "Routine checkup",
-          },
-        ],
-      },
-    ];
+    const getAllPatientReports = async () => {
+      const data = await getPatientDetail(userId);
+      setPatients(data);
+    };
 
-    setPatients(data);
-  }, []);
+    if (userId) {
+      getAllPatientReports();
+    }
+  }, [userId]);
 
-  const filtered = patients.filter(
+  const filtered = patients?.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.patientId.toLowerCase().includes(search.toLowerCase()),
@@ -88,6 +53,28 @@ export default function AdminDashboard() {
         return "text-red-400 bg-red-500/10";
       default:
         return "text-yellow-400 bg-yellow-500/10";
+    }
+  };
+
+  const handleViewReport = (patientId: string, reportId: string) => {
+    router.push(`/admin/view/${patientId}/${reportId}`);
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    const res = await deleteReport(reportId);
+
+    if (res.status === "SUCCESSFUL") {
+      toast.success(res.message);
+      setPatients((prev) =>
+        prev
+          ?.map((p) => ({
+            ...p,
+            visits: p.visits.filter((v) => v.id !== reportId),
+          }))
+          .filter((p) => p.visits.length > 0),
+      );
+    } else {
+      toast.error(res.message);
     }
   };
 
@@ -123,8 +110,8 @@ export default function AdminDashboard() {
 
           {/* Patients */}
           <div className="space-y-4">
-            {filtered.map((patient) => {
-              const lastVisit = patient.visits[0];
+            {filtered?.map((patient) => {
+              const lastVisit = patient.visits[patient.visits.length - 1];
 
               return (
                 <div
@@ -169,7 +156,7 @@ export default function AdminDashboard() {
                   {/* Expanded Section */}
                   {expanded === patient.id && (
                     <div className="border-t border-white/10 p-4 space-y-4">
-                      {patient.visits.map((visit) => (
+                      {[...patient.visits].reverse().map((visit) => (
                         <div
                           key={visit.id}
                           className="bg-[#020617] border border-white/10 rounded-lg p-4"
@@ -189,10 +176,10 @@ export default function AdminDashboard() {
                             Date: {new Date(visit.date).toLocaleDateString()}
                           </p>
 
-                          <p className="text-sm text-gray-400 mb-1">
+                          {/* <p className="text-sm text-gray-400 mb-1">
                             Doctor: {visit.doctor}
-                          </p>
-
+                          </p> */}
+                          {/* 
                           <p className="text-sm">
                             <span className="text-gray-400">Notes:</span>{" "}
                             {visit.notes}
@@ -201,16 +188,22 @@ export default function AdminDashboard() {
                           <p className="text-sm mt-1">
                             <span className="text-gray-400">Prescription:</span>{" "}
                             {visit.prescription}
-                          </p>
+                          </p> */}
 
                           <div className="mt-3 flex gap-4 text-sm">
-                            <button className="text-emerald-400 hover:underline">
+                            <button
+                              className="text-emerald-400 hover:underline"
+                              onClick={() =>
+                                handleViewReport(patient.id, visit.id)
+                              }
+                            >
                               View Report
                             </button>
-                            <button className="text-blue-400 hover:underline">
-                              Edit
-                            </button>
-                            <button className="text-red-400 hover:underline">
+
+                            <button
+                              className="text-red-400 hover:underline"
+                              onClick={() => handleDeleteReport(visit.id)}
+                            >
                               Delete
                             </button>
                           </div>

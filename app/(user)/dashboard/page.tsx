@@ -1,48 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSelector } from "react-redux";
 import { User } from "@/lib/store/slices/user-slice";
+import { get } from "http";
+import { getPatientsReportAction } from "@/features/db/patients-queries";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 
 type Report = {
-  id: string;
+  id: number;
   title: string;
-  date: string;
-  status: "normal" | "critical" | "pending";
+  date: Date | null;
+  status: string | null;
 };
 
 export default function DashboardPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [sort, setSort] = useState("newest");
   const [search, setSearch] = useState("");
+  const router = useRouter();
 
   const user: User = useSelector((state: any) => state.user.user);
-  console.log(user);
 
   useEffect(() => {
-    const data: Report[] = [
-      {
-        id: "1",
-        title: "Complete Blood Count (CBC)",
-        date: "2025-03-20",
-        status: "normal",
-      },
-      {
-        id: "2",
-        title: "Liver Function Test (LFT)",
-        date: "2025-02-11",
-        status: "critical",
-      },
-      {
-        id: "3",
-        title: "Kidney Function Test (KFT)",
-        date: "2025-01-05",
-        status: "pending",
-      },
-    ];
-    setReports(data);
-  }, []);
+    getPatientsReportAction(user.userId).then((data) => {
+      setReports(data);
+    });
+  }, [user.userId]);
+
+  const handleView = (reportId: number) => {
+    router.push(`/report/${reportId}`);
+  };
 
   const filtered = reports
     .filter((r) => r.title.toLowerCase().includes(search.toLowerCase()))
@@ -60,6 +51,88 @@ export default function DashboardPage() {
         return "text-red-400 bg-red-500/10";
       default:
         return "text-yellow-400 bg-yellow-500/10";
+    }
+  };
+
+  const downloadPDF = async (reportId: string) => {
+    try {
+      const response = await fetch(`/api/pdf/${reportId}`);
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      /*
+     =========================================
+     GET FILENAME FROM HEADERS
+     =========================================
+    */
+
+      const disposition = response.headers.get("Content-Disposition");
+
+      let filename = `report_${reportId}.pdf`;
+
+      if (disposition) {
+        /*
+       =========================================
+       filename*=UTF-8''
+       =========================================
+      */
+
+        const utf8Match = disposition.match(/filename\*=UTF-8''(.+)/);
+
+        if (utf8Match?.[1]) {
+          filename = decodeURIComponent(utf8Match[1]);
+        } else {
+          /*
+         =========================================
+         fallback filename=""
+         =========================================
+        */
+
+          const normalMatch = disposition.match(/filename="(.+)"/);
+
+          if (normalMatch?.[1]) {
+            filename = normalMatch[1];
+          }
+        }
+      }
+
+      /*
+     =========================================
+     BLOB
+     =========================================
+    */
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      /*
+     =========================================
+     DOWNLOAD
+     =========================================
+    */
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = filename;
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF downloaded");
+    } catch (error) {
+      console.error(error);
+
+      toast.error("PDF download failed");
     }
   };
 
@@ -83,14 +156,54 @@ export default function DashboardPage() {
                 className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
 
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm"
-              >
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-              </select>
+              <div className="relative w-40">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                  className="
+      appearance-none
+      w-full
+      rounded-xl
+      border
+      border-white/10
+      bg-white/5
+      backdrop-blur-md
+      px-4
+      py-2.5
+      pr-10
+      text-sm
+      text-white
+      outline-none
+      transition-all
+      duration-200
+      hover:bg-white/10
+      focus:border-emerald-400
+      focus:ring-2
+      focus:ring-emerald-400/20
+      cursor-pointer
+    "
+                >
+                  <option value="newest" className="bg-[#0f172a]">
+                    Newest
+                  </option>
+
+                  <option value="oldest" className="bg-[#0f172a]">
+                    Oldest
+                  </option>
+                </select>
+
+                <ChevronDown
+                  size={16}
+                  className="
+      absolute
+      right-3
+      top-1/2
+      -translate-y-1/2
+      text-gray-400
+      pointer-events-none
+    "
+                />
+              </div>
             </div>
           </div>
 
@@ -121,10 +234,16 @@ export default function DashboardPage() {
                   </span>
 
                   <div className="mt-4 flex justify-between items-center">
-                    <button className="text-emerald-400 text-sm hover:underline">
+                    <button
+                      onClick={() => handleView(report.id)}
+                      className="text-emerald-400 text-sm hover:underline"
+                    >
                       View
                     </button>
-                    <button className="text-gray-400 text-sm hover:text-white">
+                    <button
+                      onClick={() => downloadPDF(String(report.id))}
+                      className="text-gray-400 text-sm hover:text-white"
+                    >
                       Download PDF
                     </button>
                   </div>

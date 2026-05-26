@@ -1,7 +1,7 @@
 import argon2 from "argon2";
 import { OTP_EXPIRY_TIME } from "@/lib/constants-types";
 import { RegisterFormData } from "./register-schema";
-import { tempUsers, users } from "@/drizzle/schema";
+import { doctors, labs, patients, tempUsers, users } from "@/drizzle/schema";
 import { db } from "@/config/drizzle/db";
 import { generateUserId } from "@/features/server/utils";
 
@@ -34,7 +34,15 @@ type DataType = {
 export const storeUser = async (data: DataType) => {
   try {
     const userId = await generateUserId(data.role, data.name, db);
-    await db.insert(users).values({ userId, ...data });
+    const res = await db.insert(users).values({ userId, ...data });
+
+    if (data.role === "lab") {
+      await db.insert(labs).values({ labId: userId });
+    } else if (data.role === "patient") {
+      await db.insert(patients).values({ patientId: userId });
+    } else {
+      await db.insert(doctors).values({ doctorId: userId });
+    }
   } catch (error) {
     console.log(error);
   }

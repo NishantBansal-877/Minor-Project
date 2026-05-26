@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { getPatientDetail } from "@/features/db/admin-queries";
+import { useSelector } from "react-redux";
 
 type Visit = {
   id: string;
@@ -11,40 +13,12 @@ type Visit = {
 };
 
 export default function UserProfile() {
-  const [visits, setVisits] = useState<Visit[]>([]);
-
-  const user = {
-    name: "Ashok Kumar",
-    patientId: "LIS-ASH-4821",
-    phone: "+91 98XXXXXX21",
-    email: "ashok@example.com",
-    gender: "Male",
-  };
-
-  useEffect(() => {
-    // mock data
-    setVisits([
-      { id: "1", date: "2025-03-20", test: "CBC", status: "normal" },
-      { id: "2", date: "2025-02-10", test: "LFT", status: "critical" },
-      { id: "3", date: "2025-01-05", test: "KFT", status: "normal" },
-    ]);
-  }, []);
+  const { userId, name, email, gender, number } = useSelector(
+    (state: any) => state.user.user,
+  );
 
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-white/10 bg-[#020617]/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
-            LIS
-          </Link>
-          <Link href="/dashboard" className="text-sm text-gray-400">
-            Back
-          </Link>
-        </div>
-      </header>
-
       {/* Main */}
       <main className="flex-1">
         <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
@@ -54,25 +28,25 @@ export default function UserProfile() {
 
             <div className="grid md:grid-cols-2 gap-4 text-sm">
               <p>
-                <span className="text-gray-400">Name:</span> {user.name}
+                <span className="text-gray-400">Name:</span> {name}
               </p>
               <p>
-                <span className="text-gray-400">Patient ID:</span>{" "}
-                {user.patientId}
+                <span className="text-gray-400">Patient ID:</span> {userId}
+              </p>
+
+              <p>
+                <span className="text-gray-400">Email:</span> {email}
               </p>
               <p>
-                <span className="text-gray-400">Phone:</span> {user.phone}
+                <span className="text-gray-400">Gender:</span> {gender}
               </p>
               <p>
-                <span className="text-gray-400">Email:</span> {user.email}
-              </p>
-              <p>
-                <span className="text-gray-400">Gender:</span> {user.gender}
+                <span className="text-gray-400">Mobile:</span> {number}
               </p>
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Stats
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-white/5 border border-white/10 rounded-xl p-4">
               <p className="text-2xl font-bold">{visits.length}</p>
@@ -94,10 +68,10 @@ export default function UserProfile() {
               </p>
               <p className="text-gray-400 text-sm">Last Visit</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Visit History */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+          {/* <div className="bg-white/5 border border-white/10 rounded-xl p-6">
             <h3 className="font-semibold mb-4">Visit History</h3>
 
             <div className="space-y-3">
@@ -118,8 +92,8 @@ export default function UserProfile() {
                   </span>
                 </div>
               ))}
-            </div>
-          </div>
+            </div> */
+          /* </div> */}
         </div>
       </main>
     </div>

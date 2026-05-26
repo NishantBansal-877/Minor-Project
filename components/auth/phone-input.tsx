@@ -42,13 +42,17 @@ const PhoneInput = React.forwardRef<
       inputComponent={InputComponent}
       defaultCountry="IN"
       international
-      value={value || undefined}
-      onChange={(val) => onChange?.(val ?? "")} // 🔥 FIX
+      value={value ?? undefined}
+      onChange={(val) => onChange?.(val ?? undefined)}
       {...props}
     />
   );
 });
+
 PhoneInput.displayName = "PhoneInput";
+
+/* ---------------- INPUT ---------------- */
+
 const InputComponent = React.forwardRef<
   HTMLInputElement,
   React.ComponentProps<"input">
@@ -65,7 +69,10 @@ const InputComponent = React.forwardRef<
     />
   );
 });
+
 InputComponent.displayName = "InputComponent";
+
+/* ---------------- COUNTRY TYPES ---------------- */
 
 type CountryEntry = {
   label: string;
@@ -78,6 +85,8 @@ type CountrySelectProps = {
   options: CountryEntry[];
   onChange: (country: RPNInput.Country) => void;
 };
+
+/* ---------------- COUNTRY SELECT ---------------- */
 
 const CountrySelect = ({
   disabled,
@@ -102,7 +111,7 @@ const CountrySelect = ({
         <Button
           type="button"
           disabled={disabled}
-          className="flex w-18 items-center justify-center gap-2 h-[42px] px-3 rounded-s-lg rounded-e-none bg-white/5 border border-white/10 border-r-0 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="flex w-18 items-center justify-center gap-2 h-[42px] px-3 rounded-s-lg rounded-e-none bg-white/5 border border-white/10 border-r-0 text-white"
         >
           <FlagComponent
             country={selectedCountry}
@@ -154,7 +163,7 @@ const CountrySelect = ({
   );
 };
 
-/* ---------------- COUNTRY OPTION ---------------- */
+/* ---------------- OPTION ---------------- */
 
 interface CountrySelectOptionProps extends RPNInput.FlagProps {
   selectedCountry: RPNInput.Country;

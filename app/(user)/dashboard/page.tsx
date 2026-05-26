@@ -222,12 +222,14 @@ export default function DashboardPage() {
                   <h3 className="font-semibold mb-2">{report.title}</h3>
 
                   <p className="text-sm text-gray-400 mb-3">
-                    {new Date(report.date).toDateString()}
+                    {report.date
+                      ? new Date(report.date).toDateString()
+                      : "No date"}
                   </p>
 
                   <span
                     className={`text-xs px-2 py-1 rounded ${statusColor(
-                      report.status,
+                      report.status!,
                     )}`}
                   >
                     {report.status}

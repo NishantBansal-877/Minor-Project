@@ -142,7 +142,7 @@ export async function GET(
 
     const rows = buildReportRows({
       tests: panel.tests,
-      values: report.values,
+      values: report.values!,
       gender: patient.gender,
     });
 
@@ -169,7 +169,7 @@ export async function GET(
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: "networkidle0",
+      waitUntil: "load",
     });
 
     const pdf = await page.pdf({
@@ -203,8 +203,7 @@ export async function GET(
     // ======================================================
     // RESPONSE
     // ======================================================
-
-    return new NextResponse(pdf, {
+    return new NextResponse(Buffer.from(pdf), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

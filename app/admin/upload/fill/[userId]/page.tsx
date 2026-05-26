@@ -36,17 +36,15 @@ type TestGroupType = {
   }[];
 };
 
-type PanelResultType = {
+type PanelDetailType = {
+  clinicalCategory: string;
+  labId: string;
   panelKey: string;
-
-  values: FormValues;
-
   panelTitle: string;
-
-  clinicalCategory?: string;
-
-  specimenType?: string;
-};
+  patientId: string;
+  specimenType: string;
+  values: Record<string, string | undefined>;
+}[];
 
 export default function FillTestsStepperPage() {
   const router = useRouter();
@@ -139,6 +137,7 @@ export default function FillTestsStepperPage() {
         await page.render({
           canvasContext: context,
           viewport,
+          canvas,
         }).promise;
 
         imageSource = canvas.toDataURL("image/png");

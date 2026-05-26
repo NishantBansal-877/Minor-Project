@@ -6,12 +6,10 @@ import { count, eq } from "drizzle-orm";
 import { ca } from "zod/v4/locales";
 
 type PanelDetailType = {
-  clinicalCategory: string;
-  labId: string;
+  clinicalCategory?: string;
   panelKey: string;
   panelTitle: string;
-  patientId: string;
-  specimenType: string;
+  specimenType?: string;
   values: Record<string, string | undefined>;
 }[];
 
@@ -143,23 +141,37 @@ export const deleteReport = async (reportId: string) => {
 
 export const getLabData = async (labId: string) => {
   try {
-    const { labData, reports, patients }: { labData } = await db.transaction(
-      async (tx) => {
-        const labData = await tx
-          .select({ name: users.name, role: users.role })
-          .from(users)
-          .where(eq(users.userId, labId));
-        const [reportNumbers] = await tx
-          .select({ reports: count() })
-          .from(reports)
-          .where(eq(reports.labId, labId));
-        const [patientNumbers] = await tx
-          .select({ patients: count() })
-          .from(labPatients)
-          .where(eq(labPatients.labId, labId));
-        return { labData, ...reportNumbers, ...patientNumbers };
-      },
-    );
+    const result = await db.transaction(async (tx) => {
+      const labData = await tx
+        .select({
+          name: users.name,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.userId, labId));
+
+      const [reportNumbers] = await tx
+        .select({
+          reports: count(),
+        })
+        .from(reports)
+        .where(eq(reports.labId, labId));
+
+      const [patientNumbers] = await tx
+        .select({
+          patients: count(),
+        })
+        .from(labPatients)
+        .where(eq(labPatients.labId, labId));
+
+      return {
+        labData,
+        reports: reportNumbers.reports,
+        patients: patientNumbers.patients,
+      };
+    });
+
+    const { labData, reports: totalReports, patients } = result;
   } catch (error) {}
 };
 

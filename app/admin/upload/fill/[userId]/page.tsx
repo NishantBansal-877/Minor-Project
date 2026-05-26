@@ -16,7 +16,6 @@ import { savePanelDetails } from "@/features/db/admin-queries";
 
 import { toast } from "sonner";
 
-import ReportScanner from "@/components/report-scanner";
 import DocumentPreview from "@/components/document-preview";
 
 import Tesseract from "tesseract.js";
@@ -25,173 +24,84 @@ import { extractLabValues } from "@/lib/ocr-parser";
 
 type FormValues = Record<string, string | undefined>;
 
-type TestGroupType = {
+interface TestType {
+  id: string;
+  desc: string;
+  name: string;
+}
+
+interface TestGroupType {
   title: string;
   icon: string;
+  tests: TestType[];
+}
 
-  tests: {
-    id: string;
-    desc: string;
-    name: string;
-  }[];
-};
-
-type PanelDetailType = {
-  clinicalCategory: string;
-  labId: string;
+interface PanelResultType {
   panelKey: string;
+  values: FormValues;
   panelTitle: string;
-  patientId: string;
-  specimenType: string;
-  values: Record<string, string | undefined>;
-}[];
+  clinicalCategory?: string;
+  specimenType?: string;
+}
+
+interface PanelTestType {
+  key: string;
+  name: string;
+  desc?: string;
+  unit?: string;
+  required?: boolean;
+  referenceRange?: any;
+  defaultValue?: string;
+  value?: string;
+}
+
+interface CurrentPanelType {
+  panelKey: string;
+  title: string;
+  clinicalCategory?: string;
+  specimenType?: string;
+  tests: PanelTestType[];
+}
 
 export default function FillTestsStepperPage() {
   const router = useRouter();
 
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<number>(0);
 
   const [results, setResults] = useState<PanelResultType[]>([]);
 
-  const [currentPanel, setCurrentPanel] = useState<any>(null);
-
-  const selectedUser = useSelector((state: any) => state.user.selectedUser);
-
-  const labId = useSelector((state: any) => state.user.user.userId);
+  const [currentPanel, setCurrentPanel] = useState<CurrentPanelType | null>(
+    null,
+  );
 
   const [uploadedFiles, setUploadedFiles] = useState<
     Record<number, File | null>
   >({});
 
-  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState<boolean>(false);
 
-  const processUploadedFile = async (file: File) => {
-    setOcrLoading(true);
+  const selectedUser = useSelector((state: any) => state.user.selectedUser);
 
-    try {
-      let imageSource = "";
+  const labId = useSelector((state: any) => state.user.user.userId);
 
-      /*
-     ========================================
-     IMAGE FILE
-     ========================================
-    */
-
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-
-        imageSource = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-
-          reader.onerror = reject;
-
-          reader.readAsDataURL(file);
-        });
-      } else if (file.type === "application/pdf") {
-        /*
-     ========================================
-     PDF FILE
-     ========================================
-    */
-        const pdfjsLib = await import("pdfjs-dist");
-
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
-
-        const pdfData = await file.arrayBuffer();
-
-        const pdf = await pdfjsLib.getDocument({
-          data: pdfData,
-        }).promise;
-
-        /*
-       ========================================
-       FIRST PAGE
-       ========================================
-      */
-
-        const page = await pdf.getPage(1);
-
-        const viewport = page.getViewport({
-          scale: 2,
-        });
-
-        const canvas = document.createElement("canvas");
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-          toast.error("Canvas error");
-
-          setOcrLoading(false);
-
-          return;
-        }
-
-        canvas.width = viewport.width;
-
-        canvas.height = viewport.height;
-
-        await page.render({
-          canvasContext: context,
-          viewport,
-          canvas,
-        }).promise;
-
-        imageSource = canvas.toDataURL("image/png");
-      } else {
-        toast.error("Unsupported file type");
-
-        setOcrLoading(false);
-
-        return;
-      }
-
-      /*
-     ========================================
-     OCR
-     ========================================
-    */
-
-      const result = await Tesseract.recognize(imageSource, "eng", {
-        logger: (m) => console.log(m),
-      });
-
-      const text = result.data.text;
-
-      console.log("OCR TEXT:", text);
-
-      /*
-     ========================================
-     EXTRACT VALUES
-     ========================================
-    */
-
-      const extracted = extractLabValues(text, currentPanel.tests);
-
-      console.log(extracted);
-
-      reset({
-        ...watch(),
-        ...extracted,
-      });
-
-      toast.success("Values extracted successfully");
-    } catch (err) {
-      console.error(err);
-
-      toast.error("OCR failed");
-    }
-
-    setOcrLoading(false);
-  };
   const selectedTestGroups = useSelector(
     (state: any) => state.lab.selectedTests,
   ) as TestGroupType[];
 
   const userGender = selectedUser?.gender?.toLowerCase?.() || "male";
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    watch,
+    reset,
+  } = useForm<FormValues>({
+    mode: "onChange",
+    shouldUnregister: false,
+  });
+
+  const values = watch();
 
   /* =========================================================
      GROUP PANELS
@@ -201,7 +111,6 @@ export default function FillTestsStepperPage() {
     return (selectedTestGroups || []).flatMap((g) =>
       (g.tests || []).map((t) => ({
         title: g.title,
-
         data: {
           id: t.id,
           name: t.name,
@@ -215,31 +124,17 @@ export default function FillTestsStepperPage() {
 
   const currentStepData = groupedPanels?.[step];
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    reset,
-  } = useForm<FormValues>({
-    mode: "onChange",
-
-    shouldUnregister: false,
-  });
-
-  const values = watch();
+  /* =========================================================
+     HELPERS
+  ========================================================= */
 
   const isEmpty = (v: any) => v === undefined || v === null || v === "";
 
-  /* =========================================================
-     DEFAULT VALUES
-  ========================================================= */
-
-  const buildDefaultValues = (panel: any): FormValues => {
+  const buildDefaultValues = (panel: CurrentPanelType): FormValues => {
     if (!panel?.tests) return {};
 
     return panel.tests.reduce(
-      (acc: Record<string, string | undefined>, test: any) => {
+      (acc: Record<string, string | undefined>, test: PanelTestType) => {
         acc[test.key] = test.defaultValue ?? test.value ?? "";
 
         return acc;
@@ -281,9 +176,9 @@ export default function FillTestsStepperPage() {
 
         if (!module) return;
 
-        const panel = Object.values(module)[0];
+        const panel = Object.values(module)[0] as CurrentPanelType;
 
-        setCurrentPanel(() => panel);
+        setCurrentPanel(panel);
 
         const existingValues = results?.[step]?.values;
 
@@ -295,6 +190,136 @@ export default function FillTestsStepperPage() {
 
     load();
   }, [step, currentStepData, reset, results]);
+
+  /* =========================================================
+     OCR PROCESSING
+  ========================================================= */
+
+  const processUploadedFile = async (file: File) => {
+    if (!currentPanel) return;
+
+    setOcrLoading(true);
+
+    try {
+      let imageSource = "";
+
+      /*
+      ========================================
+      IMAGE FILE
+      ========================================
+      */
+
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+
+        imageSource = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+
+          reader.onerror = reject;
+
+          reader.readAsDataURL(file);
+        });
+      } else if (file.type === "application/pdf") {
+        /*
+        ========================================
+        PDF FILE
+        ========================================
+        */
+
+        const pdfjsLib = await import("pdfjs-dist");
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url,
+        ).toString();
+
+        const pdfData = await file.arrayBuffer();
+
+        const pdf = await pdfjsLib.getDocument({
+          data: pdfData,
+        }).promise;
+
+        /*
+        ========================================
+        FIRST PAGE
+        ========================================
+        */
+
+        const page = await pdf.getPage(1);
+
+        const viewport = page.getViewport({
+          scale: 2,
+        });
+
+        const canvas = document.createElement("canvas");
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          toast.error("Canvas error");
+
+          setOcrLoading(false);
+
+          return;
+        }
+
+        canvas.width = viewport.width;
+
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+          canvas,
+        }).promise;
+
+        imageSource = canvas.toDataURL("image/png");
+      } else {
+        toast.error("Unsupported file type");
+
+        setOcrLoading(false);
+
+        return;
+      }
+
+      /*
+      ========================================
+      OCR
+      ========================================
+      */
+
+      const result = await Tesseract.recognize(imageSource, "eng", {
+        logger: (m) => console.log(m),
+      });
+
+      const text = result.data.text;
+
+      console.log("OCR TEXT:", text);
+
+      /*
+      ========================================
+      EXTRACT VALUES
+      ========================================
+      */
+
+      const extracted = extractLabValues(text, currentPanel.tests);
+
+      console.log(extracted);
+
+      reset({
+        ...watch(),
+        ...extracted,
+      });
+
+      toast.success("Values extracted successfully");
+    } catch (err) {
+      console.error(err);
+
+      toast.error("OCR failed");
+    }
+
+    setOcrLoading(false);
+  };
 
   /* =========================================================
      RANGE PARSER
@@ -458,18 +483,16 @@ export default function FillTestsStepperPage() {
   ========================================================= */
 
   const saveCurrentStepValues = (data: FormValues) => {
+    if (!currentPanel) return;
+
     setResults((prev) => {
       const updated = [...prev];
 
       updated[step] = {
         panelKey: currentPanel.panelKey,
-
         values: data,
-
         panelTitle: currentPanel.title,
-
         clinicalCategory: currentPanel.clinicalCategory,
-
         specimenType: currentPanel.specimenType,
       };
 
@@ -482,15 +505,13 @@ export default function FillTestsStepperPage() {
   ========================================================= */
 
   const onSubmit = async (data: FormValues) => {
+    if (!currentPanel) return;
+
     const panelData: PanelResultType = {
       panelKey: currentPanel.panelKey,
-
       values: data,
-
       panelTitle: currentPanel.title,
-
       clinicalCategory: currentPanel.clinicalCategory,
-
       specimenType: currentPanel.specimenType,
     };
 
@@ -558,25 +579,11 @@ export default function FillTestsStepperPage() {
 
         <Progress value={progress} className="mb-6" />
 
-        <div className=" gap-6 mb-8">
-          {/* <ReportScanner
-            tests={currentPanel.tests}
-            onExtract={(vals) => {
-              reset({
-                ...watch(),
-                ...vals,
-              });
-
-              toast.success("Values auto-filled");
-            }}
-          /> */}
-          <div
-            className="bg-white/5 border-white/10 rounded-xl p-4 flex items-center justify-center"
-            w-full
-          >
+        <div className="gap-6 mb-8">
+          <div className="bg-white/5 border-white/10 rounded-xl p-4 flex items-center justify-center w-full">
             <DocumentPreview
               file={uploadedFiles[step] || null}
-              onFileSelect={(file) => {
+              onFileSelect={(file: File) => {
                 setUploadedFiles((prev) => ({
                   ...prev,
                   [step]: file,
@@ -586,13 +593,17 @@ export default function FillTestsStepperPage() {
               }}
             />
           </div>
+
+          {ocrLoading && (
+            <p className="text-sm text-gray-400 mt-2">Processing OCR...</p>
+          )}
         </div>
 
         {/* FORM */}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid md:grid-cols-2 gap-4">
-            {currentPanel.tests.map((test: any) => {
+            {currentPanel.tests.map((test: PanelTestType) => {
               const value = values[test.key];
 
               const range = parseRange(test.referenceRange, userGender);
@@ -604,10 +615,6 @@ export default function FillTestsStepperPage() {
                 : undefined;
 
               const rhfError = errors[test.key]?.message;
-
-              /* ======================================================
-                 BORDER
-              ====================================================== */
 
               let border = "border-white/10";
 
